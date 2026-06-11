@@ -1228,5 +1228,66 @@ wireCapture('popform','popemail','popdone');
   }catch(err){}
 })();
 </script>
+
+<!-- ===== JULY 4TH FX: subtle sparkle cursor trail (desktop only, lightweight) ===== -->
+<canvas id="fx-canvas" aria-hidden="true" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:200"></canvas>
+<script>
+(function(){
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var fine = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+  var touch = ('ontouchstart' in window) || (navigator.maxTouchPoints>0);
+  // desktop only: skip reduced-motion, coarse/touch pointers, and small screens
+  if(reduce || !fine || touch || window.innerWidth < 900){ var c=document.getElementById('fx-canvas'); if(c) c.remove(); return; }
+  var cv = document.getElementById('fx-canvas'); if(!cv) return;
+  var ctx = cv.getContext('2d');
+  var DPR = Math.min(window.devicePixelRatio||1, 2);
+  var W=0,H=0;
+  function resize(){ W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  resize(); window.addEventListener('resize', resize);
+
+  // pre-rendered glow sprites (one per patriotic color) -> cheap drawImage, no per-frame shadowBlur
+  var COLORS = ['#E5202E','#ffffff','#3C6DF0','#F2C75C'];
+  var SPRITES = COLORS.map(function(col){
+    var s=32, c=document.createElement('canvas'); c.width=c.height=s;
+    var g=c.getContext('2d'); var grd=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+    grd.addColorStop(0,col); grd.addColorStop(0.35,col); grd.addColorStop(1,'rgba(0,0,0,0)');
+    g.fillStyle=grd; g.beginPath(); g.arc(s/2,s/2,s/2,0,Math.PI*2); g.fill(); return c;
+  });
+
+  var P=[], MAX=60;
+  function spark(x,y){
+    if(P.length>=MAX) return;
+    P.push({ x:x+(Math.random()-0.5)*8, y:y+(Math.random()-0.5)*8,
+      vy:-0.15-Math.random()*0.2, vx:(Math.random()-0.5)*0.3,
+      life:0, max:26+Math.random()*22, r:3+Math.random()*4,
+      s:SPRITES[(Math.random()*SPRITES.length)|0] });
+  }
+  var lastT=0;
+  window.addEventListener('pointermove', function(e){
+    var now=performance.now(); if(now-lastT<28) return; lastT=now;  // throttle ~36fps spawn
+    spark(e.clientX, e.clientY);
+  }, {passive:true});
+
+  var running=false;
+  function tick(){
+    ctx.clearRect(0,0,W,H);
+    if(!P.length){ running=false; return; }   // stop loop when idle (saves CPU)
+    ctx.globalCompositeOperation='lighter';
+    for(var i=P.length-1;i>=0;i--){
+      var p=P[i]; p.life++; p.x+=p.vx; p.y+=p.vy;
+      var t=p.life/p.max;
+      if(t>=1){ P.splice(i,1); continue; }
+      var a=(1-t)*0.8; var sz=p.r*(1.1-0.4*t)*2;
+      ctx.globalAlpha=a;
+      ctx.drawImage(p.s, p.x-sz/2, p.y-sz/2, sz, sz);
+    }
+    ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+    requestAnimationFrame(tick);
+  }
+  // only run the loop while there are particles
+  function ensure(){ if(!running){ running=true; requestAnimationFrame(tick); } }
+  window.addEventListener('pointermove', ensure, {passive:true});
+})();
+</script>
 </body>
 </html>
